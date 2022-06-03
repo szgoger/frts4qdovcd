@@ -73,14 +73,27 @@ def calc_c10s(qdos, c6_params):
 def c6_combine(c6_coeff, alpha1):
     return
 
-## Dispersion energies
+## Dispersion energies - TODO: more efficient combinatorics
 def get_r6(geom, c6):
     geom_pairs=list(itertools.product(geom, geom))
-    for k in geom_pairs:
+
+    for k in geom_pairs: #removing self-interaction terms
         if k[0] == k[1]:
             geom_pairs.remove(k)
-    print(geom_pairs)
-    return 2
+
+    for pair in geom_pairs: #removing double-counting
+        pair1, pair2 = geom.index(pair[0]), geom.index(pair[1])
+        if pair1 > pair2:
+            geom_pairs.remove(pair)
+
+    for pair in geom_pairs:
+        pair1, pair2 = geom.index(pair[0]), geom.index(pair[1])
+        distance=np.linalg.norm( np.array(pair[0]) - np.array(pair[1]) )
+        # combine C6 coefficients
+        # calculate energy
+        print(distance)
+
+    return "done"
 
 ###
 ### The program starts here
