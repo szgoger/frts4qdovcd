@@ -55,6 +55,19 @@ def qdo(alpha1, c6, alpha2):
         model_params.append( [frequency, mass, charge] )
     return model_params
 
+## Higher order C8, C10
+def calc_c8s(qdos, c6_params):
+    c8s = []
+    for ii in range(len(c6_params)):
+        c8s.append(5 * c6_params[ii]/( qdos[ii][0] * qdos[ii][1]))
+    return c8s
+
+def calc_c10s(qdos, c6_params):
+    c10s = []
+    for ii in range(len(c6_params)):
+        c10s.append( 245 * c6_params[ii]/( 8 * (qdos[ii][0] * qdos[ii][1])**2 ) )
+    return c10s
+
 
 ###
 ### The program starts here
@@ -89,4 +102,8 @@ aim_quadrupoles = rescale_quadrupole(quadrupole_alphas, r2_free, r2_aim, r4_free
 ### Parametrizing the QDO model
 qdo_parameters = qdo(aim_dipoles, aim_c6s, aim_quadrupoles) #returns a vector of NAtoms vector [frequency, mass, charge]
 
-print(qdo_parameters)
+### Higher order dispersion coefficients
+aim_c8s = calc_c8s(qdo_parameters, aim_c6s)
+aim_c10s = calc_c10s(qdo_parameters, aim_c6s)
+
+print(aim_c10s)
