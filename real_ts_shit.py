@@ -21,7 +21,18 @@ def setup_free_atom_data(dipoles, quadrupoles, c6_coeffs, atom_types):
         dipoles[ii] = free_dipoles[ atom_types[ii] ]
         quadrupoles[ii] = free_quadrupoles[ atom_types[ii] ]
         c6_coeffs[ii] = free_c6s[ atom_types[ii] ]
-    return
+
+def read_volumes(r2free, r2, r4free, r4): #TODO: these are just some random values below...
+    for ii in range(len(r2free)):
+        r2free[ii] = 3.0
+        r4free[ii] = 45.0/2.0
+        r2[ii] = 2.7
+        r4[ii] = 14.0
+
+## Reascaling of free atomic parameters
+def rescale_dipole(dipoles, r2free, r2aim):
+    scaled_dipoles = np.multiply( dipoles, np.divide( np.power(r2_aim,2.0) , np.power(r2_free,2.0) ))
+    return scaled_dipoles
 
 ### Constants and physical parameters
 free_dipoles = {"H": 4.5}
@@ -35,7 +46,13 @@ atom_types = [0] * NAtoms
 dipole_alphas, quadrupole_alphas, c6s = [0] * NAtoms, [0] * NAtoms, [0] * NAtoms
 r2_free, r2_aim, r4_free, r4_aim = [0] * NAtoms, [0] * NAtoms, [0] * NAtoms, [0] * NAtoms
 
-### Reading data
+### Reading data from actual DFT calculation
 read_geometry(coords)
 read_atypes(atom_types)
+read_volumes(r2_free, r2_aim, r4_free, r4_aim)
+
+### Free atom data
 setup_free_atom_data(dipole_alphas, quadrupole_alphas, c6s, atom_types)
+
+### Rescaling to atom in a molecule
+aim_dipoles = rescale_dipole(dipole_alphas, r2_free, r2_aim)
