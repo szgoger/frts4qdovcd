@@ -34,6 +34,16 @@ def rescale_dipole(dipoles, r2free, r2aim):
     scaled_dipoles = np.multiply( dipoles, np.divide( np.power(r2_aim,2.0) , np.power(r2_free,2.0) ))
     return scaled_dipoles
 
+def rescale_c6s(c6, r2free, r2aim):
+    scaled_c6s = np.multiply( c6, np.divide( np.power(r2_aim,4.0) , np.power(r2_free,4.0) ))
+    return scaled_c6s
+
+def rescale_quadrupole(quadrupoles, r2free, r2aim, r4free, r4aim):
+    free_factor = np.power(r4free, 2.0)/r2free
+    aim_factor = np.power(r4aim, 2.0)/r2aim
+    scaled_quadrupoles = np.multiply(quadrupoles, np.divide(aim_factor, free_factor))
+    return scaled_quadrupoles
+
 ### Constants and physical parameters
 free_dipoles = {"H": 4.5}
 free_quadrupoles = {"H": 15}
@@ -56,3 +66,7 @@ setup_free_atom_data(dipole_alphas, quadrupole_alphas, c6s, atom_types)
 
 ### Rescaling to atom in a molecule
 aim_dipoles = rescale_dipole(dipole_alphas, r2_free, r2_aim)
+aim_c6s = rescale_c6s(c6s, r2_free, r2_aim)
+aim_quadrupoles = rescale_quadrupole(quadrupole_alphas, r2_free, r2_aim, r4_free, r4_aim)
+
+print(aim_quadrupoles)
