@@ -1,4 +1,5 @@
 import numpy as np
+import itertools
 
 ## Creates an empty list of Cartesians
 def create_geometry(NAtoms):
@@ -68,6 +69,18 @@ def calc_c10s(qdos, c6_params):
         c10s.append( 245 * c6_params[ii]/( 8 * (qdos[ii][0] * qdos[ii][1])**2 ) )
     return c10s
 
+## Combination rules
+def c6_combine(c6_coeff, alpha1):
+    return
+
+## Dispersion energies
+def get_r6(geom, c6):
+    geom_pairs=list(itertools.product(geom, geom))
+    for k in geom_pairs:
+        if k[0] == k[1]:
+            geom_pairs.remove(k)
+    print(geom_pairs)
+    return 2
 
 ###
 ### The program starts here
@@ -106,4 +119,10 @@ qdo_parameters = qdo(aim_dipoles, aim_c6s, aim_quadrupoles) #returns a vector of
 aim_c8s = calc_c8s(qdo_parameters, aim_c6s)
 aim_c10s = calc_c10s(qdo_parameters, aim_c6s)
 
-print(aim_c10s)
+### Combine dispersion coefficients - TODO: physics???
+#c6_total = c6_combine(aim_c6s, aim_dipoles)
+
+### Two-body energy corrections
+r6_term = get_r6(coords, aim_c6s)
+
+print(r6_term)
