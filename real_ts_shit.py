@@ -93,7 +93,7 @@ def get_r6(geom, c6):
         # calculate energy
         print(distance)
 
-    return "done"
+    return "Work in progress, check back later"
 
 ###
 ### The program starts here
