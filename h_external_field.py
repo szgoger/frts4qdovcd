@@ -11,17 +11,18 @@ image files of hemos under different electric field.
 '''
  
 import numpy
-from pyscf import gto, scf, tools
+from pyscf import gto, scf, tools, cc
  
 mol = gto.Mole() # Benzene
 mol.atom = '''
-     H   0.0000 0.0000     0.000000000000
+     Ar 0.0000 0.0000     0.000000000000
   '''
 mol.basis = 'aug-cc-pVQZ'
-mol.spin=1
+mol.spin=0
 mol.build()
 mf0 = scf.UHF(mol)
 mf0.kernel()
+cc.UCCSD(mf0).run()
  
 #
 # Past 1, generate all hemos with external field
@@ -38,6 +39,7 @@ def apply_field(E):
     mf.scf(dm_init_guess[0])
     dm_init_guess[0] = mf.make_rdm1()
     mf.kernel()
+    cc.UCCSD(mf).run()
     #mo = mf.mo_coeff[:,mo_id]
     #if mo[23] < -1e-5:  # To ensure that all MOs have same phase
     #    mo *= -1
