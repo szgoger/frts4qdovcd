@@ -7,6 +7,31 @@ Based on example at https://github.com/pyscf/pyscf.github.io/blob/master/example
 import numpy as np
 import pyscf
 from pyscf import gto, scf, tools, cc, dft
+from scipy.special import sph_harm
+
+def cart2sph(cartesians):
+    x, y, z = cartesians
+    hxy = np.hypot(x, y)
+    r = np.hypot(hxy, z)
+    el = np.arctan2(z, hxy)
+    az = np.arctan2(y, x)
+    return az, el, r #TODO verify consistency of angles
+
+def spharm_matrix(coord,l,m):
+    for position in grid.coords:
+        print(cart2sph( position))
+    #phi, theta, r = cart2sph(coord)
+    #r = np.linalg.norm(grid.coords, axis=1)
+    #rn = np.power(r,n)
+    #combined = grid.weights * rn
+
+    #dm1 = mycc.make_rdm1(ao_repr=True)[0] + mycc.make_rdm1(ao_repr=True)[1]
+    #ao_value =  dft.numint.eval_ao(mol, grid.coords, deriv=0)
+    #rho = dft.numint.eval_rho(mol, ao_value, dm1)
+
+    #integral = np.dot(rho.T, combined.T)
+    return np.power(r,l) * sph_harm(l, m, phi, theta) # documentation is wrong for l and m???
+
 
 # The main function, handles the external field and the confinement
 def apply_confinement_and_field(molecule,E,l):
