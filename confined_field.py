@@ -17,7 +17,7 @@ def cart2sph(cartesians):
     az = np.arctan2(y, x)
     return az, el, r #TODO verify consistency of angles
 
-def spharm_matrix(l,m=0):
+def spharm_matrix(mycc, l,m=0):
 # Note that while the function can be called with any m, it only makes sense for m=0
     matelements = np.asarray([])
     for position in grid.coords:
@@ -27,11 +27,7 @@ def spharm_matrix(l,m=0):
 
         first_term = (l**2)* np.power(r,2*l-2) * spharm_m**2.0
         second_term = np.power(r,2*l-2)*l*(l+1)*spharm_mpone
-        value = first_term + second_term
-        appendme = np.asarray(value)
-        print(appendme,first_term,second_term, value)
-        np.append(matelements,appendme)
-        print(matelements)
+        matelements = np.append(matelements,first_term+second_term)
     #phi, theta, r = cart2sph(coord)
     #r = np.linalg.norm(grid.coords, axis=1)
     #rn = np.power(r,n)
@@ -126,14 +122,17 @@ cc0.kernel()
 
 # Grid for spatial integration
 grid = pyscf.dft.gen_grid.Grids(mol)
-grid.level = 8
+grid.level = 1
 grid.build()
 
-results = open("conf_alpha2_r2_r4.txt", "w")
 
-confinements = np.arange(0,0.2,0.001)
-for conf in confinements:
-    ene0, ene1, r2, r4 = apply_confinement_and_quadrupole_field(mol,0.0001,conf)
-    alpha = -3*(ene1-ene0)/0.0001/0.0001
-    results.write(str(conf) + "  "+ str(alpha) + "   "+ str(r2) +"  "+str(r4)+ "\n")
+print("expt value ",spharm_matrix(cc0,1))
+#results = open("conf_alpha2_r2_r4.txt", "w")
+
+#confinements = np.arange(0,0.2,0.001)
+#for conf in confinements:
+#    ene0, ene1, r2, r4 = apply_confinement_and_quadrupole_field(mol,0.0001,conf)
+#    alpha = -3*(ene1-ene0)/0.0001/0.0001
+#    results.write(str(conf) + "  "+ str(alpha) + "   "+ str(r2) +"  "+str(r4)+ "\n")
+
 
