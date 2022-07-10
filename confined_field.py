@@ -17,21 +17,33 @@ def cart2sph(cartesians):
     az = np.arctan2(y, x)
     return az, el, r #TODO verify consistency of angles
 
-def spharm_matrix(coord,l,m):
+def spharm_matrix(l,m=0):
+# Note that while the function can be called with any m, it only makes sense for m=0
+    matelements = np.asarray([])
     for position in grid.coords:
-        print(cart2sph( position))
+        phi, theta, r = cart2sph( position)
+        spharm_m = sph_harm(m, l, phi, theta) # documentation is wrong for l and m???
+        spharm_mpone = sph_harm(m+1, l, phi, theta)
+
+        first_term = (l**2)* np.power(r,2*l-2) * spharm_m**2.0
+        second_term = np.power(r,2*l-2)*l*(l+1)*spharm_mpone
+        value = first_term + second_term
+        appendme = np.asarray(value)
+        print(appendme,first_term,second_term, value)
+        np.append(matelements,appendme)
+        print(matelements)
     #phi, theta, r = cart2sph(coord)
     #r = np.linalg.norm(grid.coords, axis=1)
     #rn = np.power(r,n)
-    #combined = grid.weights * rn
+    print(matelements.shape)
+    combined = grid.weights * matelements
 
-    #dm1 = mycc.make_rdm1(ao_repr=True)[0] + mycc.make_rdm1(ao_repr=True)[1]
-    #ao_value =  dft.numint.eval_ao(mol, grid.coords, deriv=0)
-    #rho = dft.numint.eval_rho(mol, ao_value, dm1)
+    dm1 = mycc.make_rdm1(ao_repr=True)[0] + mycc.make_rdm1(ao_repr=True)[1]
+    ao_value =  dft.numint.eval_ao(mol, grid.coords, deriv=0)
+    rho = dft.numint.eval_rho(mol, ao_value, dm1)
 
-    #integral = np.dot(rho.T, combined.T)
-    return np.power(r,l) * sph_harm(l, m, phi, theta) # documentation is wrong for l and m???
-
+    integral = np.dot(rho.T, combined.T)
+    return integral 
 
 # The main function, handles the external field and the confinement
 def apply_confinement_and_field(molecule,E,l):
