@@ -8,30 +8,25 @@ import numpy as np
 import pyscf
 from pyscf import gto, scf, tools, cc, dft
 from scipy.special import sph_harm
+import math as m
 
-def cart2sph(cartesians):
-    x, y, z = cartesians
-    hxy = np.hypot(x, y)
-    r = np.hypot(hxy, z)
-    el = np.arctan2(z, hxy)
-    az = np.arctan2(y, x)
-    return az, el, r #TODO verify consistency of angles
+def cart2sph(coord):
+    x,y,z = coord
+    r = np.sqrt(x**2+y**2+z**2)
+    theta=np.arctan2(np.sqrt(x**2+y**2),z)
+    phi=np.arctan2(y,x)
+    return r, theta, phi
+
 
 def spharm_matrix(mycc, l,m=0):
 # Note that while the function can be called with any m, it only makes sense for m=0
     matelements = np.asarray([])
     for position in grid.coords:
-        phi, theta, r = cart2sph( position)
+        r, theta, phi = cart2sph( position)
         spharm_m = sph_harm(m, l, phi, theta) # documentation is wrong for l and m???
-        spharm_mpone = sph_harm(m+1, l, phi, theta)
+        spharm_mpone = sph_harm(m+1, l,  phi, theta)
 
-        first_term = (l**2)* np.power(r,2*l-2) * spharm_m**2.0
-        second_term = np.power(r,2*l-2)*l*(l+1)*spharm_mpone
-        matelements = np.append(matelements,first_term+second_term)
-    #phi, theta, r = cart2sph(coord)
-    #r = np.linalg.norm(grid.coords, axis=1)
-    #rn = np.power(r,n)
-    print(matelements.shape)
+        matelements = np.append(matelements, np.power(r,2*l-2) * ((l**2) * spharm_m**2.0 + l*(l+1)*(np.abs(spharm_mpone)**2))  )
     combined = grid.weights * matelements
 
     dm1 = mycc.make_rdm1(ao_repr=True)[0] + mycc.make_rdm1(ao_repr=True)[1]
@@ -108,7 +103,7 @@ def get_rn_expt(molecule,mycc,grids,n):
 # Setting up the molecule
 mol = gto.Mole()
 mol.atom = '''
-     Na 0.0000 0.0000     0.000000000000
+     H 0.0000 0.0000     0.000000000000
   '''
 mol.basis = 'aug-cc-pvQz'
 mol.spin=1
@@ -122,11 +117,11 @@ cc0.kernel()
 
 # Grid for spatial integration
 grid = pyscf.dft.gen_grid.Grids(mol)
-grid.level = 1
+grid.level = 9
 grid.build()
 
 
-print("expt value ",spharm_matrix(cc0,1))
+print("expt value ",spharm_matrix(cc0,5))
 #results = open("conf_alpha2_r2_r4.txt", "w")
 
 #confinements = np.arange(0,0.2,0.001)
