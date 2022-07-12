@@ -89,10 +89,10 @@ def apply_confinement_and_quadrupole_field(molecule,E,l):
 # Setting up the molecule
 mol = gto.Mole()
 mol.atom = '''
-     H 0.0000 0.0000     0.000000000000
+     Ne 0.0000 0.0000     0.000000000000
   '''
 mol.basis = 'aug-cc-pvQz'
-mol.spin=1
+mol.spin=0
 mol.build()
 
 # Unperturbed calculators
@@ -103,7 +103,7 @@ cc0.kernel()
 
 # Grid for spatial integration
 grid = pyscf.dft.gen_grid.Grids(mol)
-grid.level = 3
+grid.level = 9
 grid.build()
 
 # Input functions for general matrix elements
@@ -111,24 +111,24 @@ def rn(r, theta, phi, n):
     return r**n
 
 def c_operator(r, theta, phi, args):
-    m, l = args
+    l, m = args
     spharm_m = sph_harm(m, l, phi, theta) # documentation is wrong for l and m???
     spharm_mpone = sph_harm(m+1, l,  phi, theta)
     return np.power(r,2*l-2) * ((l**2) * spharm_m**2.0 + l*(l+1)*(np.abs(spharm_mpone)**2)) 
 
 def solid_harmonic_squared(r, theta, phi, args):
-    m, l = args
+    l, m = args
     one_harmonic = (r**l) * sph_harm(m, l, phi, theta)
     return one_harmonic * one_harmonic
 
-l_denom = gen_matrix_element(c_operator,mol, cc0, (0, 1))
-l_numer = gen_matrix_element(solid_harmonic_squared,mol, cc0, (0, 1))
+def polarizability_lm_lpmp(molecule, coupledcluster, l, m, lp, mp): #returns \alpha_lml'm'
+    prefactor = 16*np.pi/(2*l+1)
+    c_expt_value = gen_matrix_element(c_operator, molecule, coupledcluster, (lp, mp))
+    field_squared = gen_matrix_element(solid_harmonic_squared, molecule, coupledcluster, (lp, mp))
+    response_squared = gen_matrix_element(solid_harmonic_squared, molecule, coupledcluster, (l, m))
+    return prefactor*field_squared*response_squared/c_expt_value
 
-print("lambda = ",l_numer/l_denom)
-
-print("predicted pol = ",4*l_numer*l_numer/l_denom)
-
-print("r2 expt value : ", gen_matrix_element(rn, mol, cc0, 2))
+print(polarizability_lm_lpmp(mol, cc0, 1, 0, 1, 0))
 
 #results = open("conf_alpha2_r2_r4.txt", "w")
 
