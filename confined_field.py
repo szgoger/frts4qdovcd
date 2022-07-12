@@ -1,7 +1,7 @@
 #!/usr/bin/env python
  
 '''
-Based on example at https://github.com/pyscf/pyscf.github.io/blob/master/examples/scf/40-apply_electric_field.py
+SG
 '''
  
 import numpy as np
@@ -17,8 +17,41 @@ def cart2sph(coord):
     phi=np.arctan2(y,x)
     return r, theta, phi
 
+def gen_matrix_element(function_to_eval, molecule, mycc, m, l):
+    matelements = np.asarray([])
 
-def spharm_matrix(mycc, l,m=0):
+    for position in grid.coords:
+        r, theta, phi = cart2sph( position)
+        real_space_value = function_to_eval(r, theta, phi, m, l)
+        matelements = np.append(matelements, real_space_value)
+
+    dm1 = mycc.make_rdm1(ao_repr=True)[0] + mycc.make_rdm1(ao_repr=True)[1]
+    ao_value =  dft.numint.eval_ao(mol, grid.coords, deriv=0)
+    rho = dft.numint.eval_rho(mol, ao_value, dm1)
+
+    combined = grid.weights * matelements
+    integral = np.dot(rho.T, combined.T)
+    return integral 
+
+
+def spharm_matrix(mycc,l,m,nspher,nr):
+    matelements = np.asarray([])
+
+    for position in grid.coords:
+        r, theta, phi = cart2sph( position)
+        spharm = sph_harm(m, l, phi, theta) # documentation is wrong for l and m???
+        matelements = np.append(matelements, spharm**nspher * r**nr)
+
+    dm1 = mycc.make_rdm1(ao_repr=True)[0] + mycc.make_rdm1(ao_repr=True)[1]
+    ao_value =  dft.numint.eval_ao(mol, grid.coords, deriv=0)
+    rho = dft.numint.eval_rho(mol, ao_value, dm1)
+
+    combined = grid.weights * matelements
+    integral = np.dot(rho.T, combined.T)
+    return integral 
+
+
+def denom(molecule,mycc, l,m=0):
 # Note that while the function can be called with any m, it only makes sense for m=0
     matelements = np.asarray([])
     for position in grid.coords:
@@ -103,10 +136,10 @@ def get_rn_expt(molecule,mycc,grids,n):
 # Setting up the molecule
 mol = gto.Mole()
 mol.atom = '''
-     H 0.0000 0.0000     0.000000000000
+     He 0.0000 0.0000     0.000000000000
   '''
 mol.basis = 'aug-cc-pvQz'
-mol.spin=1
+mol.spin=0
 mol.build()
 
 # Unperturbed calculators
@@ -117,11 +150,39 @@ cc0.kernel()
 
 # Grid for spatial integration
 grid = pyscf.dft.gen_grid.Grids(mol)
-grid.level = 9
+grid.level = 3
 grid.build()
 
+# Polarizability predictors from the paper
+#denominator = denom(mol,cc0,1)
+#spharm = spharm_matrix(cc0,1,0,2,2)
+#alpha=(spharm**2 )/denominator
+#print("predicted dipole from L4 formula: ",alpha)
+#        spharm = sph_harm(m, l, phi, theta) # documentation is wrong for l and m???
 
-print("expt value ",spharm_matrix(cc0,5))
+# Testing general matrix elements
+#def r2(r, theta, phi, m, n): #need to define m and n because of bad code
+#    return r**2
+
+def c_operator(r, theta, phi, m, l):
+    spharm_m = sph_harm(m, l, phi, theta) # documentation is wrong for l and m???
+    spharm_mpone = sph_harm(m+1, l,  phi, theta)
+    return np.power(r,2*l-2) * ((l**2) * spharm_m**2.0 + l*(l+1)*(np.abs(spharm_mpone)**2)) 
+
+def solid_harmonic_squared(r, theta, phi, m, l):
+    one_harmonic = (r**l) * sph_harm(m, l, phi, theta)
+    return one_harmonic * one_harmonic
+
+l_denom = gen_matrix_element(c_operator,mol, cc0, 0, 1)
+l_numer = gen_matrix_element(solid_harmonic_squared,mol, cc0, 0, 1)
+
+print("lambda = ",l_numer/l_denom)
+
+print("predicted pol = ",4*l_numer*l_numer/l_denom)
+
+#print("expt value ",denom(mol,cc0,1))
+#print("Y l=1 m=0 expt value ",spharm_matrix(cc0,1,0))
+
 #results = open("conf_alpha2_r2_r4.txt", "w")
 
 #confinements = np.arange(0,0.2,0.001)
