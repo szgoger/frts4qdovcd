@@ -1,7 +1,7 @@
 #!/usr/bin/env python
  
 '''
-SG
+Based on example at https://github.com/pyscf/pyscf.github.io/blob/master/examples/scf/40-apply_electric_field.py
 '''
  
 import numpy as np
@@ -10,6 +10,7 @@ from pyscf import gto, scf, tools, cc, dft
 from scipy.special import sph_harm
 import math as m
 
+# Simple coordinate conversion
 def cart2sph(coord):
     x,y,z = coord
     r = np.sqrt(x**2+y**2+z**2)
@@ -17,12 +18,14 @@ def cart2sph(coord):
     phi=np.arctan2(y,x)
     return r, theta, phi
 
-def gen_matrix_element(function_to_eval, molecule, mycc, m, l):
+# General matrix element evaluation
+# returns <Psi_0|f(r)|Psi_0>
+def gen_matrix_element(function_to_eval, molecule, mycc, args):
     matelements = np.asarray([])
 
     for position in grid.coords:
         r, theta, phi = cart2sph( position)
-        real_space_value = function_to_eval(r, theta, phi, m, l)
+        real_space_value = function_to_eval(r, theta, phi, args)
         matelements = np.append(matelements, real_space_value)
 
     dm1 = mycc.make_rdm1(ao_repr=True)[0] + mycc.make_rdm1(ao_repr=True)[1]
@@ -33,41 +36,6 @@ def gen_matrix_element(function_to_eval, molecule, mycc, m, l):
     integral = np.dot(rho.T, combined.T)
     return integral 
 
-
-def spharm_matrix(mycc,l,m,nspher,nr):
-    matelements = np.asarray([])
-
-    for position in grid.coords:
-        r, theta, phi = cart2sph( position)
-        spharm = sph_harm(m, l, phi, theta) # documentation is wrong for l and m???
-        matelements = np.append(matelements, spharm**nspher * r**nr)
-
-    dm1 = mycc.make_rdm1(ao_repr=True)[0] + mycc.make_rdm1(ao_repr=True)[1]
-    ao_value =  dft.numint.eval_ao(mol, grid.coords, deriv=0)
-    rho = dft.numint.eval_rho(mol, ao_value, dm1)
-
-    combined = grid.weights * matelements
-    integral = np.dot(rho.T, combined.T)
-    return integral 
-
-
-def denom(molecule,mycc, l,m=0):
-# Note that while the function can be called with any m, it only makes sense for m=0
-    matelements = np.asarray([])
-    for position in grid.coords:
-        r, theta, phi = cart2sph( position)
-        spharm_m = sph_harm(m, l, phi, theta) # documentation is wrong for l and m???
-        spharm_mpone = sph_harm(m+1, l,  phi, theta)
-
-        matelements = np.append(matelements, np.power(r,2*l-2) * ((l**2) * spharm_m**2.0 + l*(l+1)*(np.abs(spharm_mpone)**2))  )
-    combined = grid.weights * matelements
-
-    dm1 = mycc.make_rdm1(ao_repr=True)[0] + mycc.make_rdm1(ao_repr=True)[1]
-    ao_value =  dft.numint.eval_ao(mol, grid.coords, deriv=0)
-    rho = dft.numint.eval_rho(mol, ao_value, dm1)
-
-    integral = np.dot(rho.T, combined.T)
-    return integral 
 
 # The main function, handles the external field and the confinement
 def apply_confinement_and_field(molecule,E,l):
@@ -118,28 +86,13 @@ def apply_confinement_and_quadrupole_field(molecule,E,l):
     confined_field_energy = conf_field.e_tot
     return confined_energy, confined_field_energy, r2_conf, r4_conf
 
-# Real space evaluation of r^n matrix element
-
-# Real space evaluation of r^n matrix element
-def get_rn_expt(molecule,mycc,grids,n):
-    r = np.linalg.norm(grid.coords, axis=1)
-    rn = np.power(r,n)
-    combined = grid.weights * rn
-
-    dm1 = mycc.make_rdm1(ao_repr=True)[0] + mycc.make_rdm1(ao_repr=True)[1]
-    ao_value =  dft.numint.eval_ao(mol, grid.coords, deriv=0)
-    rho = dft.numint.eval_rho(mol, ao_value, dm1)
-
-    integral = np.dot(rho.T, combined.T)
-    return integral
-
 # Setting up the molecule
 mol = gto.Mole()
 mol.atom = '''
-     He 0.0000 0.0000     0.000000000000
+     H 0.0000 0.0000     0.000000000000
   '''
 mol.basis = 'aug-cc-pvQz'
-mol.spin=0
+mol.spin=1
 mol.build()
 
 # Unperturbed calculators
@@ -153,35 +106,29 @@ grid = pyscf.dft.gen_grid.Grids(mol)
 grid.level = 3
 grid.build()
 
-# Polarizability predictors from the paper
-#denominator = denom(mol,cc0,1)
-#spharm = spharm_matrix(cc0,1,0,2,2)
-#alpha=(spharm**2 )/denominator
-#print("predicted dipole from L4 formula: ",alpha)
-#        spharm = sph_harm(m, l, phi, theta) # documentation is wrong for l and m???
+# Input functions for general matrix elements
+def rn(r, theta, phi, n):
+    return r**n
 
-# Testing general matrix elements
-#def r2(r, theta, phi, m, n): #need to define m and n because of bad code
-#    return r**2
-
-def c_operator(r, theta, phi, m, l):
+def c_operator(r, theta, phi, args):
+    m, l = args
     spharm_m = sph_harm(m, l, phi, theta) # documentation is wrong for l and m???
     spharm_mpone = sph_harm(m+1, l,  phi, theta)
     return np.power(r,2*l-2) * ((l**2) * spharm_m**2.0 + l*(l+1)*(np.abs(spharm_mpone)**2)) 
 
-def solid_harmonic_squared(r, theta, phi, m, l):
+def solid_harmonic_squared(r, theta, phi, args):
+    m, l = args
     one_harmonic = (r**l) * sph_harm(m, l, phi, theta)
     return one_harmonic * one_harmonic
 
-l_denom = gen_matrix_element(c_operator,mol, cc0, 0, 1)
-l_numer = gen_matrix_element(solid_harmonic_squared,mol, cc0, 0, 1)
+l_denom = gen_matrix_element(c_operator,mol, cc0, (0, 1))
+l_numer = gen_matrix_element(solid_harmonic_squared,mol, cc0, (0, 1))
 
 print("lambda = ",l_numer/l_denom)
 
 print("predicted pol = ",4*l_numer*l_numer/l_denom)
 
-#print("expt value ",denom(mol,cc0,1))
-#print("Y l=1 m=0 expt value ",spharm_matrix(cc0,1,0))
+print("r2 expt value : ", gen_matrix_element(rn, mol, cc0, 2))
 
 #results = open("conf_alpha2_r2_r4.txt", "w")
 
