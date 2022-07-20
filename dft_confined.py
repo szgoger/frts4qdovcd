@@ -24,9 +24,9 @@ def cart2sph(coord):
 ###
 def setup_system():
     mol = gto.M( # Change atom here
-        atom = 'H 0 0 0',
-        basis = {'H': 'cc-pv5z'},
-        spin=1,
+        atom = [["N", (0.0, 0.0, 0.0)]],
+        basis = {'N': 'unc-aug-cc-pvtz'},
+        spin=3,
         charge=0,
         verbose=0
     )
@@ -34,12 +34,12 @@ def setup_system():
 
     # Unperturbed calculators
     mf0 = dft.UKS(mol)
-    mf0.xc = 'R2SCAN,R2SCAN'
+    mf0.xc = 'PBE0'
     e0 = mf0.kernel()
 
     # Grid for spatial integration
     grid = pyscf.dft.gen_grid.Grids(mol)
-    grid.level = 2
+    grid.level = 7
     grid.build()
 
     return mol, mf0, grid, e0
@@ -48,27 +48,29 @@ def setup_system():
 # The main function, handles the external field and the confinement
 ###
 def apply_confinement_and_field(molecule,E,confinement,l):
-    #molecule.set_common_orig([0, 0, 0])  # The gauge origin for dipole integral
+    molecule.set_common_orig([0, 0, 0])  # The gauge origin for dipole integral
 
     # We apply the confinement
     h=(molecule.intor('cint1e_kin_sph') + molecule.intor('cint1e_nuc_sph')+ confinement*molecule.intor('cint1e_r2_sph')) # Adding field to the atom
     mf = dft.UKS(molecule)
-    mf.xc = 'R2SCAN,R2SCAN'
+    mf.xc = 'PBE0'
     mf.get_hcore = lambda *args: h
     mf.scf()
     e1_conf = mf.kernel()
 
     # Calculating the matrix elements
     r2_conf = gen_matrix_element(rn, molecule, mf, 2)
-    r3_conf = gen_matrix_element(rn, molecule, mf, 2)
-    new_pol = np.real(polarizability_lm_lpmp(molecule, mf, l, 0, l, 0))
+    r3_conf = gen_matrix_element(rn, molecule, mf, 3)
+    r4_conf = gen_matrix_element(rn, molecule, mf, 4)
+    #new_pol = np.real(polarizability_lm_lpmp(molecule, mf, l, 0, l, 0))
 
     # Now we apply an external electric field
+
     if l==1: # dipole
-        field=[E,0,0]
-        h=(h+ np.einsum('x,xij->ij', field, molecule.intor('cint1e_r_sph', comp=3))) # Adding field to the atom
+        #field=[E,0,0]
+        h=(h+ E* molecule.intor('cint1e_z_sph')) # Adding field to the atom
         mf = dft.UKS(molecule)
-        mf.xc = 'R2SCAN,R2SCAN'
+        mf.xc = 'PBE0'
         mf.get_hcore = lambda *args: h
         mf.scf()
         e1_field = mf.kernel()
@@ -77,19 +79,19 @@ def apply_confinement_and_field(molecule,E,confinement,l):
         field=[E/2.0,0,0]
         h=(h+3.0*np.einsum('x,xij->ij', field, molecule.intor('int1e_zz', comp=3))-np.einsum('x,xij->ij', field, molecule.intor('cint1e_r2_sph', comp=3)) ) # Adding field to the atom
         mf = dft.UKS(molecule)
-        mf.xc = 'R2SCAN,R2SCAN'
+        mf.xc = 'PBE0'
         mf.get_hcore = lambda *args: h
         mf.scf()
         e1_field = mf.kernel()
 
-    return e1_conf, e1_field, r2_conf, r3_conf, new_pol
+    return e1_conf, e1_field, r2_conf, r3_conf, r4_conf
 
 ###
 # New polarizability predictor
 ###
 def polarizability_lm_lpmp(molecule, coupledcluster, l, m, lp, mp): #returns \alpha_lml'm'
     #nr_of_electrons = gen_matrix_element(rn, molecule, coupledcluster,0)
-    nr_of_electrons = 1
+    nr_of_electrons = 1 # not sure if needed...
     prefactor = 4*nr_of_electrons*4*np.pi/(2*l+1)
 
     c_expt_value = gen_matrix_element(c_operator, molecule, coupledcluster, (lp, mp))
@@ -141,16 +143,22 @@ def solid_harmonic_squared(r, theta, phi, args):
 ################################################################################################
 molecule, calculator, grid, e0 = setup_system() # setting up the calculation
 
-field = 0.005
-confinements = np.arange(0,1,0.05)
-l = 1 #1 for dipole, 2 for quadrupolole
+atoms = ["H", "C", "O", "N"]
+pols = [4.50, 11.3, 5.3, 7.4]
+
+field = 0.0001/7.4
+
+#field = 0.001 * e0 # 0.1% of the total energy is the external field
+confinements = np.arange(0,1.05,0.05)
+l = 2 #1 for dipole, 2 for quadrupolole
 for conf in confinements:
-    curr_conf = - 0.05 * e0*conf # Up to 5% total energy as confinement
-    e1_conf, e1_field, r2, r3, pol = apply_confinement_and_field(molecule,field,curr_conf,l)
+    curr_conf = - 0.0005 * e0 * conf # Up to certain percent total energy confinement
+    e1_conf, e1_field, r2, r3, r4 = apply_confinement_and_field(molecule,field,curr_conf,l)
 
     if l == 1:
-        alpha_from_energies = -2*(e1_field-e1_conf)/field/field
+    	alpha_from_energies = -2*(e1_field-e1_conf)/field/field
     elif l == 2:
         alpha_from_energies = -3*(e1_field-e1_conf)/field/field
-
-    print(conf,alpha_from_energies, r3, r2**2, pol)
+    field = 0.0001/alpha_from_energies #updating field along confinement
+        
+    print(conf, r2, r2**2, r3, r4, alpha_from_energies)
